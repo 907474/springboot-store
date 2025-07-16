@@ -15,7 +15,9 @@ public interface TemporaryOrderRepository extends JpaRepository<TemporaryOrder, 
 
     Optional<TemporaryOrder> findByOrderIdAndStatus(Long orderId, OrderStatus status);
 
+
     Page<TemporaryOrder> findAllByStatus(OrderStatus status, Pageable pageable);
+
 
     List<TemporaryOrder> findAllByStatus(OrderStatus status);
 }

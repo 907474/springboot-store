@@ -12,8 +12,6 @@ import com.myapp.aw.store.repository.ProductRepository;
 import com.myapp.aw.store.repository.TemporaryOrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -46,27 +43,41 @@ public class AdminOrderService {
         this.productRepository = productRepository;
     }
 
-    public Page<OrderDisplayDTO> getPaginatedCombinedOrders(String statusFilter, Pageable pageable) {
-        log.info("Fetching combined orders with filter: {} and page: {}", statusFilter, pageable.getPageNumber());
-        List<OrderDisplayDTO> combinedList = new ArrayList<>();
+    // Simplified to return a full list
+    public List<OrderDisplayDTO> getCombinedOrders(String statusFilter) {
+        log.info("Fetching combined orders with filter: {}", statusFilter);
+        Stream<OrderDisplayDTO> unfinishedOrders = Stream.empty();
+        Stream<OrderDisplayDTO> finishedOrders = Stream.empty();
 
         if (statusFilter == null || "IN_PROGRESS".equals(statusFilter)) {
-            temporaryOrderRepository.findAllByStatus(OrderStatus.IN_PROGRESS)
-                    .forEach(order -> combinedList.add(toDto(order)));
+            unfinishedOrders = temporaryOrderRepository.findAllByStatus(OrderStatus.IN_PROGRESS).stream().map(this::toDto);
         }
 
         if (statusFilter == null || "FINISHED".equals(statusFilter)) {
-            orderArchiveRepository.findAll().forEach(order -> combinedList.add(toDto(order)));
+            finishedOrders = orderArchiveRepository.findAll().stream().map(this::toDto);
         }
 
-        combinedList.sort(Comparator.comparing(OrderDisplayDTO::orderDate).reversed());
+        return Stream.concat(unfinishedOrders, finishedOrders)
+                .sorted(Comparator.comparing(OrderDisplayDTO::orderDate).reversed())
+                .toList();
+    }
 
-        int start = (int) pageable.getOffset();
-        int end = Math.min((start + pageable.getPageSize()), combinedList.size());
+    // Simplified to return a full list
+    public List<OrderHistoryDTO> getCustomerOrderHistory(Long customerId, Pageable pageable) {
+        List<OrderArchive> orders = orderArchiveRepository.findByCustomerId(customerId);
 
-        List<OrderDisplayDTO> pageContent = (start > combinedList.size()) ? List.of() : combinedList.subList(start, end);
-        log.debug("Returning page {} with {} orders.", pageable.getPageNumber(), pageContent.size());
-        return new PageImpl<>(pageContent, pageable, combinedList.size());
+        return orders.stream().map(order -> {
+            int totalItems = order.getProductItems().stream()
+                    .mapToInt(ArchivedProductItem::getQuantity)
+                    .sum();
+
+            BigDecimal averagePrice = BigDecimal.ZERO;
+            if (totalItems > 0 && order.getTotalPrice() != null) {
+                averagePrice = order.getTotalPrice().divide(new BigDecimal(totalItems), 2, RoundingMode.HALF_UP);
+            }
+
+            return new OrderHistoryDTO(order, averagePrice, totalItems);
+        }).toList();
     }
 
     public List<OrderItemDetailDTO> getOrderDetails(String displayId) {
@@ -87,25 +98,7 @@ public class AdminOrderService {
             Map<Long, String> productNames = getProductNames(productIds);
             order.getProductItems().forEach(item -> items.add(new OrderItemDetailDTO(productNames.get(item.getProductId()), item.getQuantity(), item.getPriceAtPurchase())));
         }
-        log.debug("Found {} items for order {}", items.size(), displayId);
         return items;
-    }
-
-    public Page<OrderHistoryDTO> getCustomerOrderHistory(Long customerId, Pageable pageable) {
-        Page<OrderArchive> orderPage = orderArchiveRepository.findByCustomerId(customerId, pageable);
-
-        return orderPage.map(order -> {
-            int totalItems = order.getProductItems().stream()
-                    .mapToInt(ArchivedProductItem::getQuantity)
-                    .sum();
-
-            BigDecimal averagePrice = BigDecimal.ZERO;
-            if (totalItems > 0) {
-                averagePrice = order.getTotalPrice().divide(new BigDecimal(totalItems), 2, RoundingMode.HALF_UP);
-            }
-
-            return new OrderHistoryDTO(order, averagePrice, totalItems);
-        });
     }
 
     private Map<Long, String> getProductNames(List<Long> productIds) {
@@ -113,10 +106,6 @@ public class AdminOrderService {
                 .collect(Collectors.toMap(Product::getProductId, Product::getProductName));
     }
 
-    private OrderDisplayDTO toDto(TemporaryOrder order) {
-        return new OrderDisplayDTO("T-" + order.getOrderId(), order.getCustomerId(), order.getTotalPrice(), order.getOrderCreationTime(), "In Progress");
-    }
-    private OrderDisplayDTO toDto(OrderArchive order) {
-        return new OrderDisplayDTO("F-" + order.getOrderId(), order.getCustomerId(), order.getTotalPrice(), order.getOrderPlacementTime(), "Finished");
-    }
+    private OrderDisplayDTO toDto(TemporaryOrder order) { return new OrderDisplayDTO("T-" + order.getOrderId(), order.getCustomerId(), order.getTotalPrice(), order.getOrderCreationTime(), "In Progress"); }
+    private OrderDisplayDTO toDto(OrderArchive order) { return new OrderDisplayDTO("F-" + order.getOrderId(), order.getCustomerId(), order.getTotalPrice(), order.getOrderPlacementTime(), "Finished"); }
 }

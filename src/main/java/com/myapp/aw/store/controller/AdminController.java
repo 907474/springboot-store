@@ -217,7 +217,7 @@ public class AdminController {
 
         Pageable pageable = PageRequest.of(page, 10);
         model.addAttribute("customer", customer);
-        model.addAttribute("ordersPage", orderArchiveRepository.findByCustomerId(customerId, pageable));
+        model.addAttribute("ordersPage", adminOrderService.getCustomerOrderHistory(customerId, pageable));
 
         return "admin-customer-orders";
     }

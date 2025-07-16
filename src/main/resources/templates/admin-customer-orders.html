@@ -2,20 +2,20 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
-    <title>Customer Order History</title>
+    <title>Order History</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f0f8ff; }
         .banner { background-color: #fff; color: #333; padding: 10px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e0e0e0; }
         .banner-title a { font-size: 1.5em; font-weight: bold; color: #333; text-decoration: none; }
-        .banner-actions { display: flex; align-items: center; }
-        .banner-actions a, .banner-actions form { margin-left: 10px; }
         .header-btn { color: #333; text-decoration: none; padding: 8px 15px; border: 1px solid #ccc; border-radius: 5px; }
         .login-logout-btn { background-color: purple; color: yellow; border-color: darkmagenta; font-family: inherit; font-size: 1em; cursor: pointer; }
-        .content-container { max-width: 1000px; margin: 40px auto; padding: 20px 40px; background-color: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        h1 { margin-top: 0; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background-color: #f8f8f8; }
+        .content-container { max-width: 1000px; margin: 40px auto; padding: 20px 40px; }
+        h1 { margin-top: 0; text-align: center; }
+        .order-card { background-color: white; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 25px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .order-header { background-color: #f8f8f8; padding: 15px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; font-weight: bold; }
+        .order-items-table { width: 100%; border-collapse: collapse; }
+        .order-items-table th, .order-items-table td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+        .order-items-table tr:last-child td { border-bottom: none; }
         .pagination-controls { text-align: center; padding: 20px 0; }
         .pagination-controls a, .pagination-controls span { margin: 0 10px; text-decoration: none; color: #007bff; font-weight: bold; }
         .pagination-controls .disabled { color: #ccc; pointer-events: none; }
@@ -23,30 +23,29 @@
 </head>
 <body>
 <div th:replace="~{fragments :: banner}"></div>
-
 <div class="content-container">
     <h1>Order History for <span th:text="${customer.username}"></span></h1>
 
-    <table>
-        <thead>
-        <tr>
-            <th>Order ID</th>
-            <th>Date</th>
-            <th>Total Items</th>
-            <th>Avg. Item Price</th>
-            <th>Order Total</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="history : ${ordersPage.content}">
-            <td th:text="'#' + ${history.order.orderId}"></td>
-            <td th:text="${#temporals.format(history.order.orderPlacementTime, 'MMM dd, yyyy')}"></td>
-            <td th:text="${history.totalItems}"></td>
-            <td th:text="'$' + ${#numbers.formatDecimal(history.averageItemPrice, 1, 'COMMA', 2, 'POINT')}"></td>
-            <td th:text="'$' + ${#numbers.formatDecimal(history.order.totalPrice, 1, 'COMMA', 2, 'POINT')}"></td>
-        </tr>
-        </tbody>
-    </table>
+    <div class="order-card" th:each="order : ${ordersPage.content}">
+        <div class="order-header">
+            <span>Order ID: #[(${order.orderId})]</span>
+            <span>Date: [[${#temporals.format(order.orderPlacementTime, 'MMM dd, yyyy')}]]</span>
+            <span>Total: $[[${#numbers.formatDecimal(order.totalPrice, 1, 'COMMA', 2, 'POINT')}]]</span>
+        </div>
+        <table class="order-items-table">
+            <thead>
+            <tr><th>Product Name</th><th>SKU</th><th>Quantity</th><th>Price at Purchase</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="item : ${order.productItems}">
+                <td th:text="${productMap.get(item.productId)?.productName ?: 'Unknown'}"></td>
+                <td th:text="${productMap.get(item.productId)?.productSku ?: 'N/A'}"></td>
+                <td th:text="${item.quantity}"></td>
+                <td th:text="'$' + ${#numbers.formatDecimal(item.priceAtPurchase, 1, 'COMMA', 2, 'POINT')}"></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
 
     <div class="pagination-controls" th:if="${ordersPage.totalPages > 1}">
         <a th:if="${ordersPage.hasPrevious()}" th:href="@{/admin/customer/{id}/orders(id=${customer.id}, page=${ordersPage.number - 1})}">Previous</a>
