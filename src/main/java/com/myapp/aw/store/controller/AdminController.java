@@ -23,6 +23,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,7 +38,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -200,6 +200,7 @@ public class AdminController {
     @GetMapping("/admin/top-customers")
     public String showTopCustomers(Model model, @RequestParam(defaultValue = "0") int page) {
         log.info("GET /admin/top-customers - Request received for top customers page {}.", page);
+        Objects.requireNonNull(statisticsService, "StatisticsService is null in AdminController. Check constructor.");
         model.addAttribute("customerPage", statisticsService.getTopCustomers(PageRequest.of(page, 15)));
         return "admin-top-customers";
     }
@@ -212,11 +213,11 @@ public class AdminController {
     ) {
         log.info("Request for order history for customer ID: {}, page: {}", customerId, page);
         Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Customer not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Customer with ID " + customerId + " not found."));
 
         Pageable pageable = PageRequest.of(page, 10);
         model.addAttribute("customer", customer);
-        model.addAttribute("ordersPage", adminOrderService.getCustomerOrderHistory(customerId, pageable));
+        model.addAttribute("ordersPage", orderArchiveRepository.findByCustomerId(customerId, pageable));
 
         return "admin-customer-orders";
     }
@@ -317,5 +318,12 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("errorMessage", "Failed to process the file. Please ensure it's a valid Excel format and data types are correct.");
         }
         return "redirect:/admin/bulk-edit";
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public String handleResponseStatusException(ResponseStatusException ex, RedirectAttributes redirectAttributes) {
+        log.error("Handling ResponseStatusException: {}", ex.getMessage());
+        redirectAttributes.addFlashAttribute("errorMessage", ex.getReason());
+        return "redirect:/admin/customers";
     }
 }
