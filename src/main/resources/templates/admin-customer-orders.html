@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <title>Order History</title>
+    <style>
+        /* Add all the same styles as your other admin pages for consistency */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f0f8ff; }
+        .banner { /* ... */ }
+        .content-container { max-width: 1000px; margin: 40px auto; padding: 20px 40px; background-color: white; border-radius: 8px; }
+        h1, h2 { margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        .pagination-controls { text-align: center; padding: 20px 0; }
+        .pagination-controls a, .pagination-controls span { margin: 0 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+<div th:replace="~{fragments :: banner}"></div>
+<div class="content-container">
+    <h1>Order History for <span th:text="${customer.username}"></span></h1>
+
+    <table>
+        <thead>
+        <tr><th>Order ID</th><th>Date</th><th>Total</th><th>Items</th></tr>
+        </thead>
+        <tbody>
+        <tr th:each="order : ${ordersPage.content}">
+            <td th:text="'#' + ${order.orderId}"></td>
+            <td th:text="${#temporals.format(order.orderPlacementTime, 'MMM dd, yyyy')}"></td>
+            <td th:text="'$' + ${#numbers.formatDecimal(order.totalPrice, 1, 'COMMA', 2, 'POINT')}"></td>
+            <td th:text="${order.productItems.size()}"></td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="pagination-controls" th:if="${ordersPage.totalPages > 1}">
+        <a th:if="${ordersPage.hasPrevious()}" th:href="@{/admin/customer/{id}/orders(id=${customer.id}, page=${ordersPage.number - 1})}">Previous</a>
+        <span th:unless="${ordersPage.hasPrevious()}">Previous</span>
+        <span>Page [[${ordersPage.number + 1}]] of [[${ordersPage.totalPages}]]</span>
+        <a th:if="${ordersPage.hasNext()}" th:href="@{/admin/customer/{id}/orders(id=${customer.id}, page=${ordersPage.number + 1})}">Next</a>
+        <span th:unless="${ordersPage.hasNext()}">Next</span>
+    </div>
+</div>
+</body>
+</html>
