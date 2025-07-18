@@ -18,6 +18,8 @@ public interface OrderArchiveRepository extends JpaRepository<OrderArchive, Long
 
     List<OrderArchive> findByOrderPlacementTimeBetween(LocalDateTime start, LocalDateTime end);
 
-    @Query("SELECT o FROM OrderArchive o LEFT JOIN FETCH o.productItems WHERE o.customerId = :customerId ORDER BY o.orderPlacementTime DESC")
-    Page<OrderArchive> findByCustomerIdWithItems(@Param("customerId") Long customerId, Pageable pageable);
+    Page<OrderArchive> findByCustomerId(Long customerId, Pageable pageable);
+
+    @Query("SELECT o FROM OrderArchive o WHERE o.customerId = :searchId OR o.orderId = :searchId")
+    Page<OrderArchive> findByCustomerIdOrOrderId(@Param("searchId") Long searchId, Pageable pageable);
 }

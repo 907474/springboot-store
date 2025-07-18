@@ -17,6 +17,7 @@ import com.myapp.aw.store.service.StatisticsService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -38,6 +39,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -97,17 +99,68 @@ public class AdminController {
     public String showAllOrders(
             Model model,
             @RequestParam(defaultValue = "0") int unfinishedPage,
-            @RequestParam(defaultValue = "0") int finishedPage
+            @RequestParam(defaultValue = "0") int finishedPage,
+            @RequestParam(required = false) Long searchCustomerId
     ) {
-        log.info("GET /admin/all-orders - Request received for all orders page.");
+        log.info("GET /admin/all-orders - searchCustomerId: {}", searchCustomerId);
         int pageSize = 5;
-        model.addAttribute("unfinishedOrdersPage",
-                temporaryOrderRepository.findAllByStatus(OrderStatus.IN_PROGRESS, PageRequest.of(unfinishedPage, pageSize)));
+        Pageable unfinishedPageable = PageRequest.of(unfinishedPage, pageSize);
+        Pageable finishedPageable = PageRequest.of(finishedPage, pageSize);
 
-        model.addAttribute("finishedOrdersPage",
-                orderArchiveRepository.findAll(PageRequest.of(finishedPage, pageSize)));
+        Page<com.myapp.aw.store.model.TemporaryOrder> unfinishedOrders;
+        Page<com.myapp.aw.store.model.OrderArchive> finishedOrders;
+
+        if (searchCustomerId != null) {
+            unfinishedOrders = temporaryOrderRepository.findAllByStatusAndCustomerId(
+                    OrderStatus.IN_PROGRESS, searchCustomerId, unfinishedPageable);
+            finishedOrders = orderArchiveRepository.findByCustomerId(searchCustomerId, finishedPageable);
+            model.addAttribute("searchCustomerId", searchCustomerId);
+        } else {
+            unfinishedOrders = temporaryOrderRepository.findAllByStatus(
+                    OrderStatus.IN_PROGRESS, unfinishedPageable);
+            finishedOrders = orderArchiveRepository.findAll(finishedPageable);
+        }
+
+        model.addAttribute("unfinishedOrdersPage", unfinishedOrders);
+        model.addAttribute("finishedOrdersPage", finishedOrders);
 
         return "admin-all-orders";
+    }
+
+    @GetMapping("/admin/search-orders")
+    public String searchAllOrders(
+            Model model,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int unfinishedPage,
+            @RequestParam(defaultValue = "0") int finishedPage
+    ) {
+        log.info("GET /admin/search-orders - Live search for keyword: '{}'", keyword);
+        int pageSize = 5;
+        Pageable unfinishedPageable = PageRequest.of(unfinishedPage, pageSize);
+        Pageable finishedPageable = PageRequest.of(finishedPage, pageSize);
+
+        Page<com.myapp.aw.store.model.TemporaryOrder> unfinishedOrders;
+        Page<com.myapp.aw.store.model.OrderArchive> finishedOrders;
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            String numericKeyword = keyword.replaceAll("[^0-9]", "");
+            try {
+                Long searchId = Long.parseLong(numericKeyword);
+                unfinishedOrders = temporaryOrderRepository.findByStatusAndCustomerIdOrOrderId(OrderStatus.IN_PROGRESS, searchId, unfinishedPageable);
+                finishedOrders = orderArchiveRepository.findByCustomerIdOrOrderId(searchId, finishedPageable);
+            } catch (NumberFormatException e) {
+                unfinishedOrders = Page.empty(unfinishedPageable);
+                finishedOrders = Page.empty(finishedPageable);
+            }
+        } else {
+            unfinishedOrders = temporaryOrderRepository.findAllByStatus(OrderStatus.IN_PROGRESS, unfinishedPageable);
+            finishedOrders = orderArchiveRepository.findAll(finishedPageable);
+        }
+
+        model.addAttribute("unfinishedOrdersPage", unfinishedOrders);
+        model.addAttribute("finishedOrdersPage", finishedOrders);
+        model.addAttribute("keyword", keyword);
+        return "admin-all-orders :: orderTables";
     }
 
     @GetMapping("/admin/order-details/{displayId}")
