@@ -38,7 +38,7 @@ public class AccountController {
                     .map(GrantedAuthority::getAuthority)
                     .collect(Collectors.joining(", "));
             model.addAttribute("roles", roles);
-            return "admin-account";
+            return "customer-account";
         } else {
             Customer customer = customerRepository.findByUsername(username)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Customer not found"));
